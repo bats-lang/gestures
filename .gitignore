@@ -1,0 +1,5 @@
+build/
+dist/
+docs/
+bats_modules/
+bats.lock

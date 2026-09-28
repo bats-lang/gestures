@@ -1,0 +1,9 @@
+[package]
+name = "pan-unlocked"
+kind = "bin"
+unsafe = false
+
+[dependencies]
+"gestures" = ""
+"array" = ""
+"arith" = ""

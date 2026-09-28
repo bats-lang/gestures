@@ -1,0 +1,9 @@
+[package]
+name = "long-press-locked"
+kind = "bin"
+unsafe = false
+
+[dependencies]
+"gestures" = ""
+"array" = ""
+"arith" = ""

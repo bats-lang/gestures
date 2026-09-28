@@ -1,0 +1,9 @@
+[package]
+name = "locked-silent"
+kind = "bin"
+unsafe = false
+
+[dependencies]
+"gestures" = ""
+"array" = ""
+"arith" = ""

@@ -1,0 +1,9 @@
+[package]
+name = "both-axes"
+kind = "bin"
+unsafe = false
+
+[dependencies]
+"gestures" = ""
+"array" = ""
+"arith" = ""

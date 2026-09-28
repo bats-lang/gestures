@@ -1,0 +1,8 @@
+[package]
+name = "replay"
+kind = "bin"
+unsafe = false
+
+[dependencies]
+"gestures" = ""
+"array" = ""
