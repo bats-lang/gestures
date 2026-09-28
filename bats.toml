@@ -1,0 +1,8 @@
+[package]
+name = "gestures"
+kind = "lib"
+unsafe = false
+
+[dependencies]
+"array" = ""
+"arith" = ""

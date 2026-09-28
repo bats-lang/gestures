@@ -1,0 +1,64 @@
+flick left: 40 px in 60 ms
+  pan 1 0
+  pan 1 -160
+  pan 1 -320
+  commit 1 left
+slow drag right: 60 px in 1 s
+  pan 1 0
+  pan 1 300
+  pan 1 760
+  cancel 1 right
+long drag left: 120 px, slowly
+  pan 1 0
+  pan 1 -1120
+  commit 1 left
+flick back: 60 px right, then moving left fast
+  pan 1 0
+  pan 1 -160
+  pan 1 -480
+  cancel 1 right
+diagonal: never leaves the dead zone
+vertical in a horizontal region: ignored, even when it turns
+vertical in the list: locks vertically, then cannot turn
+  pan 3 0
+  pan 3 -600
+  pan 3 -600
+  commit 3 up
+edge start: 10 px from the left edge, no horizontal drag
+pointercancel mid-drag: cancels, never commits
+  pan 1 0
+  cancel 1 left
+cancel-all (the app hidden) mid-drag
+  pan 1 0
+  cancel 1 right
+second finger during a drag, no pinch: ignored
+  pan 1 0
+  pan 1 -1200
+  commit 1 left
+two fingers in the map: the drag cancels, a pinch takes over
+  pan 2 0
+  cancel 2 left
+  pinch 2 1877 4640 3200
+  pinch 2 2560 4000 3200
+  pinch-end 2
+long press: 500 ms within slop, then no drag
+  long-press 1 3250 3200
+long press cancelled by moving past slop
+unknown pointers and a fifth finger: ignored
+  pan 3 0
+  commit 3 up
+rendered offset: a drag during a transition starts where it is
+  pan 1 -800
+  pan 1 -640
+  cancel 1 right
+  transitionend 1
+  pan 1 0
+  cancel 1 right
+  scrollend 1 1200
+a touch-only region: a mouse drag is left alone, a pen drag is not
+  pan 4 0
+  commit 4 left
+bytes: a flick right as the shim sends it
+  pan 1 0
+  pan 1 400
+  commit 1 right

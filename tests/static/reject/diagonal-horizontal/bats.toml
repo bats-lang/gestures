@@ -1,0 +1,9 @@
+[package]
+name = "diagonal-horizontal"
+kind = "bin"
+unsafe = false
+
+[dependencies]
+"gestures" = ""
+"array" = ""
+"arith" = ""
