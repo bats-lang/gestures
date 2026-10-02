@@ -6,6 +6,6 @@ staload "gestures/src/pointer.sats"
 staload "gestures/src/tracker.sats"
 
 (* one that never locked cannot commit *)
-prval _ = RLcommit(): RELEASE(AMB, END_COMMIT)
+prval _ = RLcommit(LockedOnH()): RELEASE(DeadZone, Committed)
 
 implement main0 () = ()

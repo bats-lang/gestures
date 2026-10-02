@@ -1,0 +1,9 @@
+[package]
+name = "parent-as-int"
+kind = "bin"
+unsafe = false
+
+[dependencies]
+"gestures" = ""
+"array" = ""
+"arith" = ""

@@ -6,6 +6,6 @@ staload "gestures/src/pointer.sats"
 staload "gestures/src/tracker.sats"
 
 (* a cancel cannot commit *)
-prval _ = ABcancel(): ABORT(LOCKH, END_COMMIT)
+prval _ = ABcancel(LockedOnH()): ABORT(LockedH, Committed)
 
 implement main0 () = ()

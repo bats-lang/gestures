@@ -5,7 +5,7 @@ staload "gestures/src/classify.sats"
 staload "gestures/src/pointer.sats"
 staload "gestures/src/tracker.sats"
 
-(* nor can a locked pointer lock again *)
-prval _ = MVlockv(deadzone_diagonal{0}()): MOVE(LOCKH, LOCKV)
+(* nor can a locked pointer lock again: only a deciding phase locks *)
+prval _ = MVlockv(DecidingWithinSlop(), CLv(ABSpos(), ABSpos()): CLASS(0, 10, Vertical)): MOVE(LockedH, LockedV)
 
 implement main0 () = ()

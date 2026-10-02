@@ -78,7 +78,7 @@ in show(gestures_frame(src, st, t)) end
 
 implement main0 () = let
   val st = gestures_new()
-  val () = gestures_region(st, 1, ~1, AxH(), false, true, DevAll())
+  val () = gestures_region(st, 1, NoRegion(), AxH(), false, true, DevAll())
   val src = gestures_source_new()
   (* a touch drag to the left: one frame asked for while it moves, the
      events at the frame, the commit at the up, at once *)

@@ -1,0 +1,9 @@
+[package]
+name = "pointer-kind-left-out"
+kind = "bin"
+unsafe = false
+
+[dependencies]
+"gestures" = ""
+"array" = ""
+"arith" = ""

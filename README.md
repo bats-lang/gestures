@@ -29,12 +29,15 @@ and taps stay native (`click`); the library never emits a tap.
 val st = gestures_new ()
 (* region 1 owns horizontal drags; its element must declare
    touch_action(AxH(), false), which is "pan-y" *)
-val () = gestures_region (st, 1, ~1, AxH (), false, false, DevTouch ())
+val () = gestures_region (st, 1, NoRegion (), AxH (), false, false, DevTouch ())
 ...
 val evs = gestures_feed (st, bytes, n)   (* or gestures_step (st, input) *)
 (* GPan(region, delta) while dragging, then exactly one of
    GCommit(region, dir) or GCancel(region, dir) *)
 ```
+
+A region is declared inside another (`InRegion(id)`) or outermost
+(`NoRegion()`). A region is a linear value: `region_free` lets one go.
 
 A region takes gestures from every pointer (`DevAll`) or from touch and
 pen only (`DevTouch`). Use `DevTouch` where a mouse drag must stay the
@@ -61,15 +64,27 @@ In `src/classify.bats`, with the integer classifier
   or dy changes sign.
 * `deadzone_diagonal`: the dead zone is not empty (every `(d, d)` is in it).
 
-In `src/pointer.bats`, a pointer's phase is in its type, and each step's
-type says which phase can follow which (`MOVE`, `RELEASE`, `ABORT`):
+Every choice is a datatype or a datasort, matched with `case+`: a
+displacement's class (`axis_class`: `Ambiguous | Horizontal | Vertical`),
+a pointer's phase (`phase`: `WithinSlop | DeadZone | LockedH | LockedV |
+Rejected | LongPressed | Inert`), how a drag ends (`drag_end`: `NoEnd |
+Committed | Cancelled`), a pointer's kind (`pointer_kind`: `Touch | Mouse
+| Pen`) and a region or none (`region`). The host's numbers for them
+(record and pointer kinds, -1 for no region) are read once, where its
+bytes are decoded.
 
-* `lock_stable`: once an axis is locked it does not change before release.
+In `src/pointer.bats`, a pointer's phase is in its type, and each step's
+type says which phase can follow which (`MOVE`, `RELEASE`, `ABORT`;
+`LOCKED`, `UNLOCKED`, `DECIDING` and `STAYING` say which phases are
+which):
+
+* `lock_stable`: once an axis is locked it does not change before release
+  (`SAME_PHASE`).
 * `locked_ends`: a locked gesture ends in exactly one of commit or cancel.
 * `unlocked_silent`: a gesture that never locked ends in neither.
 * `abort_never_commits`: a cancel never commits.
 * Only a locked pointer pans (`panned(q)`), and a long-press takes only
-  a pointer still within slop (`pointer(PEND)`), so it cannot follow a
+  a pointer still within slop (`pointer(WithinSlop)`), so it cannot follow a
   drag.
 
 In `src/tracker.bats`, the entry point `gestures_step` is total. A move,
@@ -78,12 +93,14 @@ up or cancel for an unknown pointer is ignored, as is a down past the
 linear value, made at its down and consumed at its up or cancel. The
 host's bytes are checked once, in `src/decode.bats`: positions are
 clamped to ±8192 px, so no product overflows, and a record of an unknown
-kind is ignored.
+kind (or a down of an unknown pointer kind) is ignored.
 
 `tests/static` holds programs that must be rejected: a diagonal claimed
 horizontal, a locked pointer turning, a locked drag ending silently, a
 cancel committing, an unlocked pointer panning, a locked pointer
-long-pressing.
+long-pressing, a phase or a region given as a number, and a match that
+leaves out a phase, a pointer kind or a class. Its runner also fails on
+any `case` without `+`.
 
 ## Trace replay
 
