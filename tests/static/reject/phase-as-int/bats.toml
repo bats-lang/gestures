@@ -1,0 +1,9 @@
+[package]
+name = "phase-as-int"
+kind = "bin"
+unsafe = false
+
+[dependencies]
+"gestures" = ""
+"array" = ""
+"arith" = ""

@@ -13,6 +13,7 @@
 #use array as A
 
 staload "./consts.sats"
+staload "./pointer.sats"
 staload "./tracker.sats"
 staload "./decode.sats"
 
@@ -23,19 +24,32 @@ staload "./decode.sats"
 (* A raw record: twelve int32 little-endian fields, its kind first *)
 #pub stadef RAW_RECORD = 48
 
-(* The raw kinds, as the host writes them. Positions are in 1/16 CSS px,
-   times in ms; a region is the innermost one hit (data-gesture-region),
-   -1 for none *)
-#pub stadef RAW_DOWN = 0              (* id, x, y, t, pointer kind, button, region, viewport width,
-                                         transition running (1 or 0), its translate x, y *)
-#pub stadef RAW_MOVE = 1              (* id, x, y, t *)
-#pub stadef RAW_UP = 2                (* id, x, y, t *)
-#pub stadef RAW_CANCEL = 3            (* id *)
-#pub stadef RAW_LOST_CAPTURE = 4      (* id *)
-#pub stadef RAW_HIDDEN = 5            (* the page hidden, or the window's focus lost *)
-#pub stadef RAW_SCROLLEND = 6         (* region, offset *)
-#pub stadef RAW_TRANSITIONEND = 7     (* region (only for the region's own element) *)
-#pub stadef RAW_TRANSITIONCANCEL = 8  (* region (likewise) *)
+(* The raw kinds. The host writes each as a number, given here, which
+   _raw_kind reads, once. Positions are in 1/16 CSS px, times in ms; a
+   region is the innermost one hit (data-gesture-region), -1 for none *)
+#pub datatype raw_kind =
+  | RawDown               (* 0: id, x, y, t, pointer kind, button, region, viewport width,
+                                transition running (1 or 0), its translate x, y *)
+  | RawMove               (* 1: id, x, y, t *)
+  | RawUp                 (* 2: id, x, y, t *)
+  | RawCancel             (* 3: id *)
+  | RawLostCapture        (* 4: id *)
+  | RawHidden             (* 5: the page hidden, or the window's focus lost *)
+  | RawScrollEnd          (* 6: region, offset *)
+  | RawTransitionEnd      (* 7: region (only for the region's own element) *)
+  | RawTransitionCancel   (* 8: region (likewise) *)
+
+fn _raw_kind (k: int): Option_vt(raw_kind) =
+  if k = 0 then Some_vt(RawDown())
+  else if k = 1 then Some_vt(RawMove())
+  else if k = 2 then Some_vt(RawUp())
+  else if k = 3 then Some_vt(RawCancel())
+  else if k = 4 then Some_vt(RawLostCapture())
+  else if k = 5 then Some_vt(RawHidden())
+  else if k = 6 then Some_vt(RawScrollEnd())
+  else if k = 7 then Some_vt(RawTransitionEnd())
+  else if k = 8 then Some_vt(RawTransitionCancel())
+  else None_vt()
 
 (* ============================================================
    What the source asks of the host
@@ -90,7 +104,7 @@ fun _starts_free {n:nat} .<n>. (xs: list_vt(mouse_start, n)): void =
 
 fn _input_free (i: input): void =
   case+ i of
-  | ~IDown(_, _, _, _, _, _, _) => () | ~IMove(_, _, _, _) => () | ~IUp(_, _, _, _) => ()
+  | ~IDown(_, _, _, _, _, hit, _) => region_free(hit) | ~IMove(_, _, _, _) => () | ~IUp(_, _, _, _) => ()
   | ~ICancel(_) => () | ~ITick(_) => () | ~ICancelAll() => ()
   | ~IRenderedOffset(_, _, _) => () | ~IScrollEnd(_, _) => ()
   | ~ITransitionEnd(_) => () | ~ITransitionCancel(_) => ()
@@ -237,67 +251,77 @@ fn _cancel_all (src: !source): actions =
 #pub fn gestures_raw {l:agz}{o:addr}{n:nat}{p:nat | p + RAW_RECORD <= n}
   (src: !source, st: !gstate, b: !$A.arrx(byte, l, n, o), p: int p): @(gevents, actions)
 
+(* What the source does with a raw record up or a cancel of pointer id:
+   given at once, with what waited before it *)
+fn _ended_now (src: !source, st: !gstate, id: int, ending: input): @(gevents, actions) =
+  if ~_down_has(src, id) then let
+    val () = _input_free(ending)
+  in @(list_vt_nil(), list_vt_nil()) end
+  else let
+    val () = _forget(src, id)
+    val () = (case+ src of
+      | @Source(_, _, waiting, _) => let
+          val () = waiting := list_vt_cons(ending, waiting)
+          prval () = fold@(src)
+        in end)
+  in @(_flush(src, st), list_vt_nil()) end
+
 implement gestures_raw {l}{o}{n}{p} (src, st, b, p) = let
-  val kind = gestures_int32(b, p)
   val id = gestures_int32(b, p + 4)
   val x = gestures_coord(gestures_int32(b, p + 8))
   val y = gestures_coord(gestures_int32(b, p + 12))
   val t = gestures_stamp(gestures_int32(b, p + 16))
 in
-  if kind = 0 (* RAW_DOWN *) then let
-    val pointer_kind = gestures_int32(b, p + 20)
-    val button = gestures_int32(b, p + 24)
-    val region = gestures_int32(b, p + 28)
-    val width = gestures_int32(b, p + 32)
-    val transitioning = gestures_int32(b, p + 36)
-  in
-    (* a mouse's other buttons are the browser's *)
-    if pointer_kind = 1 (* KIND_MOUSE *) && button <> 0 then @(list_vt_nil(), list_vt_nil())
-    else let
-      (* a region caught in flight: where it is drawn now *)
-      val asked = (if transitioning = 1 then
-          _wait(src, IRenderedOffset(region, gestures_int32(b, p + 40), gestures_int32(b, p + 44)), list_vt_nil())
-        else list_vt_nil()): actions
-      val () = (case+ src of
-        | @Source(down, starts, _, _) => let
-            val () = down := list_vt_cons(id, down)
-            val () = starts := _add_start(starts, id, x, y, pointer_kind = 1 (* KIND_MOUSE *))
-            prval () = fold@(src)
-          in end)
-    in @(list_vt_nil(), _wait(src, IDown(id, x, y, t, pointer_kind, region, width), asked)) end
-  end
-  else if kind = 1 (* RAW_MOVE *) then
-    (if ~_down_has(src, id) then @(list_vt_nil(), list_vt_nil())
-     else let
-       (* a mouse is captured once it has moved 4 px: a click (no
-          drag) keeps its own target *)
-       val asked = (case+ src of
-         | @Source(_, starts, _, _) =>
-           if _moved_far(starts, id, x, y) then let
-             val () = starts := _remove_start(starts, id)
-             prval () = fold@(src)
-           in list_vt_cons(CapturePointer(id), list_vt_nil()) end
-           else let prval () = fold@(src) in list_vt_nil() end): actions
-     in @(list_vt_nil(), _wait(src, IMove(id, x, y, t), asked)) end)
-  else if kind = 2 (* RAW_UP *) || kind = 3 (* RAW_CANCEL *) then
-    (if ~_down_has(src, id) then @(list_vt_nil(), list_vt_nil())
-     else let
-       val () = _forget(src, id)
-       val () = (case+ src of
-         | @Source(_, _, waiting, _) => let
-             val () = waiting := list_vt_cons((if kind = 2 then IUp(id, x, y, t) else ICancel(id)): input, waiting)
-             prval () = fold@(src)
-           in end)
-     in @(_flush(src, st), list_vt_nil()) end)
-  else if kind = 4 (* RAW_LOST_CAPTURE *) then
-    (if _down_has(src, id) then @(list_vt_nil(), _cancel_all(src)) else @(list_vt_nil(), list_vt_nil()))
-  else if kind = 5 (* RAW_HIDDEN *) then @(list_vt_nil(), _cancel_all(src))
-  else if kind = 6 (* RAW_SCROLLEND *) then
-    (if id >= 0 then @(list_vt_nil(), _wait(src, IScrollEnd(id, x), list_vt_nil()))
-     else @(list_vt_nil(), list_vt_nil()))
-  else if kind = 7 (* RAW_TRANSITIONEND *) then @(list_vt_nil(), _wait(src, ITransitionEnd(id), list_vt_nil()))
-  else if kind = 8 (* RAW_TRANSITIONCANCEL *) then @(list_vt_nil(), _wait(src, ITransitionCancel(id), list_vt_nil()))
-  else @(list_vt_nil(), list_vt_nil())
+  case+ _raw_kind(gestures_int32(b, p)) of
+  | ~None_vt() => @(list_vt_nil(), list_vt_nil())
+  | ~Some_vt(kind) => (case+ kind of
+    | RawDown() => (case+ gestures_pointer_kind(gestures_int32(b, p + 20)) of
+      | ~None_vt() => @(list_vt_nil(), list_vt_nil())
+      | ~Some_vt(pointer_kind) => let
+          val button = gestures_int32(b, p + 24)
+          val region = gestures_int32(b, p + 28)
+          val width = gestures_int32(b, p + 32)
+          val transitioning = gestures_int32(b, p + 36) = 1
+          val is_mouse = (case+ pointer_kind of Mouse() => true | Touch() => false | Pen() => false): bool
+        in
+          (* a mouse's other buttons are the browser's *)
+          if is_mouse && button <> 0 then @(list_vt_nil(), list_vt_nil())
+          else let
+            (* a region caught in flight: where it is drawn now *)
+            val asked = (if ~transitioning then list_vt_nil()
+              else if region < 0 then list_vt_nil()
+              else _wait(src, IRenderedOffset(region, gestures_int32(b, p + 40), gestures_int32(b, p + 44)), list_vt_nil())): actions
+            val () = (case+ src of
+              | @Source(down, starts, _, _) => let
+                  val () = down := list_vt_cons(id, down)
+                  val () = starts := _add_start(starts, id, x, y, is_mouse)
+                  prval () = fold@(src)
+                in end)
+          in @(list_vt_nil(), _wait(src, IDown(id, x, y, t, pointer_kind, gestures_region_of(region), width), asked)) end
+        end)
+    | RawMove() =>
+      if ~_down_has(src, id) then @(list_vt_nil(), list_vt_nil())
+      else let
+        (* a mouse is captured once it has moved 4 px: a click (no
+           drag) keeps its own target *)
+        val asked = (case+ src of
+          | @Source(_, starts, _, _) =>
+            if _moved_far(starts, id, x, y) then let
+              val () = starts := _remove_start(starts, id)
+              prval () = fold@(src)
+            in list_vt_cons(CapturePointer(id), list_vt_nil()) end
+            else let prval () = fold@(src) in list_vt_nil() end): actions
+      in @(list_vt_nil(), _wait(src, IMove(id, x, y, t), asked)) end
+    | RawUp() => _ended_now(src, st, id, IUp(id, x, y, t))
+    | RawCancel() => _ended_now(src, st, id, ICancel(id))
+    | RawLostCapture() =>
+      if _down_has(src, id) then @(list_vt_nil(), _cancel_all(src)) else @(list_vt_nil(), list_vt_nil())
+    | RawHidden() => @(list_vt_nil(), _cancel_all(src))
+    | RawScrollEnd() =>
+      if id >= 0 then @(list_vt_nil(), _wait(src, IScrollEnd(id, x), list_vt_nil()))
+      else @(list_vt_nil(), list_vt_nil())
+    | RawTransitionEnd() => @(list_vt_nil(), _wait(src, ITransitionEnd(id), list_vt_nil()))
+    | RawTransitionCancel() => @(list_vt_nil(), _wait(src, ITransitionCancel(id), list_vt_nil())))
 end
 
 (* The animation frame the source asked for, at time t: while a pointer

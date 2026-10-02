@@ -5,7 +5,10 @@ staload "gestures/src/classify.sats"
 staload "gestures/src/pointer.sats"
 staload "gestures/src/tracker.sats"
 
-(* a pointer locked horizontally cannot move to vertical *)
-prval _ = MVstay(StayingLockedH()): MOVE(LockedH, LockedV)
+(* a match on a displacement's class that leaves the dead zone out *)
+fn axis_name {c:axis_class} (class: class_is(c)): string =
+  case+ class of
+  | IsHorizontal() => "horizontal"
+  | IsVertical() => "vertical"
 
 implement main0 () = ()

@@ -41,59 +41,69 @@ primplement abs_neg {x}{a} (p) =
   | ABSpos() => sif x == 0 then ABSpos() else ABSneg()
   | ABSneg() => ABSpos()
 
-(* The classes *)
-#pub stadef AMBIG = 0
-#pub stadef HORIZ = 1
-#pub stadef VERT = 2
+(* The classes: a choice of three, a datasort *)
+#pub datasort axis_class =
+  | Ambiguous
+  | Horizontal
+  | Vertical
 
 (* CLASS(dx, dy, c): the displacement (dx, dy) is of class c *)
-#pub dataprop CLASS(int, int, int) =
+#pub dataprop CLASS(int, int, axis_class) =
   | {dx,dy:int}{ax,ay:nat | DZ_MINOR * ay < DZ_MAJOR * ax}
-    CLh(dx, dy, HORIZ) of (ABS(dx, ax), ABS(dy, ay))
+    CLh(dx, dy, Horizontal) of (ABS(dx, ax), ABS(dy, ay))
   | {dx,dy:int}{ax,ay:nat | DZ_MINOR * ax < DZ_MAJOR * ay}
-    CLv(dx, dy, VERT) of (ABS(dx, ax), ABS(dy, ay))
+    CLv(dx, dy, Vertical) of (ABS(dx, ax), ABS(dy, ay))
   | {dx,dy:int}{ax,ay:nat | DZ_MINOR * ay >= DZ_MAJOR * ax; DZ_MINOR * ax >= DZ_MAJOR * ay}
-    CLa(dx, dy, AMBIG) of (ABS(dx, ax), ABS(dy, ay))
+    CLa(dx, dy, Ambiguous) of (ABS(dx, ax), ABS(dy, ay))
+
+(* A class, as a value: what classify answers, matched with case+ *)
+#pub datatype class_is(axis_class) =
+  | IsAmbiguous(Ambiguous)
+  | IsHorizontal(Horizontal)
+  | IsVertical(Vertical)
+
+(* SAME_CLASS(c, d): c and d are one class *)
+#pub dataprop SAME_CLASS(axis_class, axis_class) =
+  | {c:axis_class} SameClass(c, c)
 
 (* The class of (dx, dy) *)
-#pub fn classify {dx,dy:int} (dx: int dx, dy: int dy): [c:int | c >= AMBIG; c <= VERT] (CLASS(dx, dy, c) | int c)
+#pub fn classify {dx,dy:int} (dx: int dx, dy: int dy): [c:axis_class] (CLASS(dx, dy, c) | class_is(c))
 implement classify {dx,dy} (dx, dy) = let
   val (px | ax) = absv(dx)
   val (py | ay) = absv(dy)
 in
-  if dz_minor() * ay < dz_major() * ax then (CLh(px, py) | 1)
-  else if dz_minor() * ax < dz_major() * ay then (CLv(px, py) | 2)
-  else (CLa(px, py) | 0)
+  if dz_minor() * ay < dz_major() * ax then (CLh(px, py) | IsHorizontal())
+  else if dz_minor() * ax < dz_major() * ay then (CLv(px, py) | IsVertical())
+  else (CLa(px, py) | IsAmbiguous())
 end
 
-(* A displacement has one class *)
-#pub prfn class_unique {dx,dy:int}{c,d:int}
-  (p: CLASS(dx, dy, c), q: CLASS(dx, dy, d)): [c == d] void
+(* A displacement has one class: two classes of it are the same one
+   (two different ones would need |dx| and |dy| to be two numbers each) *)
+#pub prfn class_unique {dx,dy:int}{c,d:axis_class}
+  (p: CLASS(dx, dy, c), q: CLASS(dx, dy, d)): SAME_CLASS(c, d)
 
-primplement class_unique {dx,dy}{c,d} (p, q) = let
-  prfn parts {c:int} (p: CLASS(dx, dy, c)):
-    [ax,ay:nat | (c == HORIZ && DZ_MINOR * ay < DZ_MAJOR * ax) ||
-                 (c == VERT && DZ_MINOR * ax < DZ_MAJOR * ay) ||
-                 (c == AMBIG && DZ_MINOR * ay >= DZ_MAJOR * ax && DZ_MINOR * ax >= DZ_MAJOR * ay)]
-    (ABS(dx, ax), ABS(dy, ay)) =
-    case+ p of
-    | CLh(a, b) => (a, b)
-    | CLv(a, b) => (a, b)
-    | CLa(a, b) => (a, b)
-  prval (pa, pb) = parts(p)
-  prval (qa, qb) = parts(q)
-  prval () = abs_unique(pa, qa)
-  prval () = abs_unique(pb, qb)
-in end
+primplement class_unique {dx,dy}{c,d} (p, q) =
+  case+ (p, q) of
+  | (CLh(_, _), CLh(_, _)) => SameClass()
+  | (CLv(_, _), CLv(_, _)) => SameClass()
+  | (CLa(_, _), CLa(_, _)) => SameClass()
+  | (CLh(a, b), CLv(e, f)) =/=> let prval () = abs_unique(a, e) prval () = abs_unique(b, f) in () end
+  | (CLh(a, b), CLa(e, f)) =/=> let prval () = abs_unique(a, e) prval () = abs_unique(b, f) in () end
+  | (CLv(a, b), CLh(e, f)) =/=> let prval () = abs_unique(a, e) prval () = abs_unique(b, f) in () end
+  | (CLv(a, b), CLa(e, f)) =/=> let prval () = abs_unique(a, e) prval () = abs_unique(b, f) in () end
+  | (CLa(a, b), CLh(e, f)) =/=> let prval () = abs_unique(a, e) prval () = abs_unique(b, f) in () end
+  | (CLa(a, b), CLv(e, f)) =/=> let prval () = abs_unique(a, e) prval () = abs_unique(b, f) in () end
 
 (* No displacement is both horizontal and vertical *)
 #pub prfn class_exclusive {dx,dy:int}
-  (h: CLASS(dx, dy, HORIZ), v: CLASS(dx, dy, VERT)): [false] void
+  (h: CLASS(dx, dy, Horizontal), v: CLASS(dx, dy, Vertical)): [false] void
 
-primplement class_exclusive {dx,dy} (h, v) = class_unique(h, v)
+primplement class_exclusive {dx,dy} (h, v) = let
+  prval same = class_unique(h, v)
+in case+ same of SameClass() =/=> () end
 
 (* The class does not change when dx changes sign ... *)
-#pub prfn class_flip_x {dx,dy:int}{c:int} (p: CLASS(dx, dy, c)): CLASS(~dx, dy, c)
+#pub prfn class_flip_x {dx,dy:int}{c:axis_class} (p: CLASS(dx, dy, c)): CLASS(~dx, dy, c)
 
 primplement class_flip_x {dx,dy}{c} (p) =
   case+ p of
@@ -102,7 +112,7 @@ primplement class_flip_x {dx,dy}{c} (p) =
   | CLa(a, b) => CLa(abs_neg(a), b)
 
 (* ... nor when dy does *)
-#pub prfn class_flip_y {dx,dy:int}{c:int} (p: CLASS(dx, dy, c)): CLASS(dx, ~dy, c)
+#pub prfn class_flip_y {dx,dy:int}{c:axis_class} (p: CLASS(dx, dy, c)): CLASS(dx, ~dy, c)
 
 primplement class_flip_y {dx,dy}{c} (p) =
   case+ p of
@@ -112,7 +122,7 @@ primplement class_flip_y {dx,dy}{c} (p) =
 
 (* The dead zone is not empty: every diagonal displacement (d, d) is in
    it, for the constants chosen *)
-#pub prfn deadzone_diagonal {d:int} (): CLASS(d, d, AMBIG)
+#pub prfn deadzone_diagonal {d:int} (): CLASS(d, d, Ambiguous)
 
 primplement deadzone_diagonal {d} () = let
   prval a = abs_total{d}()

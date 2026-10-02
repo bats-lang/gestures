@@ -5,7 +5,10 @@ staload "gestures/src/classify.sats"
 staload "gestures/src/pointer.sats"
 staload "gestures/src/tracker.sats"
 
-(* a pointer locked horizontally cannot move to vertical *)
-prval _ = MVstay(StayingLockedH()): MOVE(LockedH, LockedV)
+(* a match on a pointer's kind that leaves the pen out *)
+fn is_mouse (kind: pointer_kind): bool =
+  case+ kind of
+  | Touch() => false
+  | Mouse() => true
 
 implement main0 () = ()

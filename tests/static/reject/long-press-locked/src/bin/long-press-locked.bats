@@ -6,6 +6,6 @@ staload "gestures/src/pointer.sats"
 staload "gestures/src/tracker.sats"
 
 (* a locked pointer cannot long-press *)
-fn f (p: pointer(LOCKH)): pointer(LP) = pointer_long_press(p)
+fn f (p: pointer(LockedH)): @(pointer(LongPressed), region) = pointer_long_press(p)
 
 implement main0 () = ()

@@ -6,6 +6,6 @@ staload "gestures/src/pointer.sats"
 staload "gestures/src/tracker.sats"
 
 (* only a locked pointer pans *)
-fn f (): panned(AMB) = Panned(1, 5)
+fn f (): panned(DeadZone) = Panned(LockedOnH() | 1, 5)
 
 implement main0 () = ()

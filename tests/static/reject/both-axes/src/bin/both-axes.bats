@@ -6,6 +6,6 @@ staload "gestures/src/pointer.sats"
 staload "gestures/src/tracker.sats"
 
 (* 10 across and 1 down is not vertical *)
-prval _ = CLv(ABSpos(), ABSpos()): CLASS(10, 1, VERT)
+prval _ = CLv(ABSpos(), ABSpos()): CLASS(10, 1, Vertical)
 
 implement main0 () = ()
