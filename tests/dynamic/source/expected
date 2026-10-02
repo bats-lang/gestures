@@ -1,0 +1,44 @@
+touch down
+  want frame
+move
+move
+frame 1033
+  pan 1 0
+  pan 1 -480
+  want frame
+move
+up
+  pan 1 -2080
+  commit 1 left
+frame 1066
+mouse down, right button
+mouse down
+  want frame
+move 3 px
+move 6 px
+  capture 9
+move again
+frame 2041
+  pan 1 0
+  want frame
+hidden
+frame 2050
+  cancel 1 right
+up of a cancelled pointer
+touch down
+  want frame
+frame 3100
+  want frame
+frame 3600
+  long-press 1 1600 4800
+  want frame
+lost capture of another pointer
+lost capture
+frame 3700
+scrollend outside every region
+scrollend
+  want frame
+transitionend
+frame 4000
+  scrollend 1 1024
+  transitionend 1

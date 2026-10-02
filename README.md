@@ -2,10 +2,23 @@
 
 Pointer gesture recognition for Bats: drags with axis lock, long-press
 and pinch. It is written for a WASM app in an Android WebView, over
-Pointer Events. The library is pure and safe (`unsafe = false`). The
-browser side is bridge's `listen_gestures` shim, which forwards pointer
-events and a per-frame tick, batched once per animation frame, as
-records that `gestures_feed` decodes.
+Pointer Events. The library is pure and safe (`unsafe = false`).
+
+The browser side is thin: bridge's `listen_pointer` forwards each
+pointer, scroll and transition event as a raw record as it comes. What
+used to be JS is the pointer source here (`src/source.bats`):
+`gestures_raw` takes a raw record and `gestures_frame` an animation
+frame's time; between them they batch inputs once per frame, add a tick
+each frame while a pointer is down (long-press), give an up or a cancel
+to the recognizer at once (so its gesture ends before the click that
+follows), capture a mouse once it has moved 4 px (a click keeps its own
+target), and cancel every pointer when the page is hidden, loses the
+focus or a pointer's capture. Each returns the recognizer's events and
+the actions the host must take: `CapturePointer(id)` (bridge's
+`pointer_capture`) and `WantFrame` (bridge's `animation_frame`).
+
+`gestures_feed` still decodes batched records, for hosts that batch
+themselves.
 
 When input is ambiguous, the library does nothing. Scrolling, snap-paging
 and taps stay native (`click`); the library never emits a tap.
