@@ -2,3 +2,4 @@ build/
 dist/
 docs/
 bats_modules/
+__pycache__/

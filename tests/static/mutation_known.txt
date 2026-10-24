@@ -1,0 +1,7 @@
+# file | lemma | operator | reason: accepted mutants that are explained (quire's mutation_check.py --known).
+# The statement `[false] void` has no false variant: the probe `[1 == 2] void` is the same statement,
+# so it is accepted when the lemma is proved at all. The lemma's premises are contradictory by design,
+# and each has a reject fixture (tests/static/reject/class-exclusive-same-class,
+# tests/static/reject/locked-unlocked-both-locked) that the premises are not met by two of one kind.
+src/classify.bats | class_exclusive | probe 1==2 | the conclusion [false] is the probe's statement
+src/pointer.bats | locked_unlocked | probe 1==2 | the conclusion [false] is the probe's statement
