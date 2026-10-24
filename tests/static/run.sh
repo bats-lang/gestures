@@ -6,11 +6,18 @@
 # Fixtures depend on this checkout, which is uploaded to a scratch copy
 # of the repository first.
 #
+# A reject whose `expect` starts with `function ` is decided by expect.py
+# (copied from sha256 main, which took it from quire#585; no bats
+# equivalent exists): the function, the line of src/bin/<name>.bats and
+# patsopt's error word for word, and no other error. Older rejects keep a
+# substring of the log.
+#
 # Last, every match in src/ and tests/ must be case+.
 #
 # usage: tests/static/run.sh <repository-dir>   (bats must be on PATH)
 set -eu
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
+PYTHONDONTWRITEBYTECODE=1 python3 -I "$ROOT/tests/static/expect_test.py"
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 cp -R "$1" "$TMP/repo"
@@ -45,6 +52,9 @@ for d in "$ROOT"/tests/static/reject/*/; do
   [ -d "$d" ] || continue
   n=$(basename "$d")
   if check "$d"; then echo "FAIL reject/$n: should be rejected"; fail=1
+  elif head -1 "$d/expect" | grep -q '^function '; then
+    if python3 -I "$ROOT/tests/static/expect.py" "$d" "$TMP/$n.log" > "$TMP/$n.expect" 2>&1; then echo "ok   reject/$n"
+    else echo "FAIL reject/$n: rejected, but not as its expect says: $(cat "$TMP/$n.expect")"; fail=1; fi
   elif grep -qF -- "$(cat "$d/expect")" "$TMP/$n.log"; then echo "ok   reject/$n"
   else echo "FAIL reject/$n: rejected, but not with: $(cat "$d/expect")"; grep -E 'error' "$TMP/$n.log" | head -5; fail=1; fi
 done

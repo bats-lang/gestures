@@ -1,1 +1,9 @@
-S2Ecst(Vertical)
+function two_horizontal
+line 11
+the dynamic expression cannot be assigned the type [S2Eapp(S2Ecst(CLASS); S2Evar(dx(9335)), S2Evar(dy(9336)), S2Eapp(S2Ecst(Vertical); ))].
+mismatch of static terms (equal):
+The actual term is: S2Eapp(S2Ecst(Horizontal); )
+The needed term is: S2Eapp(S2Ecst(Vertical); )
+mismatch of static terms (tyleq):
+The actual term is: S2Eapp(S2Ecst(CLASS); S2Evar(dx(9335)), S2Evar(dy(9336)), S2Eapp(S2Ecst(Horizontal); ))
+The needed term is: S2Eapp(S2Ecst(CLASS); S2Evar(dx(9335)), S2Evar(dy(9336)), S2Eapp(S2Ecst(Vertical); ))
