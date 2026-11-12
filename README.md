@@ -4,54 +4,8 @@ Pointer gesture recognition for Bats: drags with axis lock, long-press
 and pinch. It is written for a WASM app in an Android WebView, over
 Pointer Events. The library is pure and safe (`unsafe = false`).
 
-The browser side is thin: bridge's `listen_pointer` forwards each
-pointer, scroll and transition event as a raw record as it comes. What
-used to be JS is the pointer source here (`src/source.bats`):
-`gestures_raw` takes a raw record and `gestures_frame` an animation
-frame's time; between them they batch inputs once per frame, add a tick
-each frame while a pointer is down (long-press), give an up or a cancel
-to the recognizer at once (so its gesture ends before the click that
-follows), capture a mouse once it has moved 4 px (a click keeps its own
-target), and cancel every pointer when the page is hidden, loses the
-focus or a pointer's capture. Each returns the recognizer's events and
-the actions the host must take: `CapturePointer(id)` (bridge's
-`pointer_capture`) and `WantFrame` (bridge's `animation_frame`).
-
-`gestures_feed` still decodes batched records, for hosts that batch
-themselves.
-
 When input is ambiguous, the library does nothing. Scrolling, snap-paging
 and taps stay native (`click`); the library never emits a tap.
-
-## Use
-
-```bats
-val st = gestures_new ()
-(* region 1 owns horizontal drags; its element must declare
-   touch_action(AxH(), false), which is "pan-y" *)
-val () = gestures_region (st, 1, NoRegion (), AxH (), false, false, DevTouch ())
-...
-val evs = gestures_feed (st, bytes, n)   (* or gestures_step (st, input) *)
-(* GPan(region, delta) while dragging, then exactly one of
-   GCommit(region, dir) or GCancel(region, dir) *)
-```
-
-A region is declared inside another (`InRegion(id)`) or outermost
-(`NoRegion()`). A region is a linear value: `region_free` lets one go.
-
-A region takes gestures from every pointer (`DevAll`) or from touch and
-pen only (`DevTouch`). Use `DevTouch` where a mouse drag must stay the
-browser's (text selection).
-
-Every event carries its region's id. The events are:
-
-- `GPan(r, delta)`: displacement along the locked axis, from where it locked.
-- `GCommit(r, dir)` or `GCancel(r, dir)`: how a drag ends.
-- `GLongPress(r, x, y)`.
-- `GPinch(r, scale, cx, cy)` and `GPinchEnd(r)`.
-- `GScrollEnd(r, offset)`, `GTransitionEnd(r)` and `GTransitionCancel(r)`: native-owned state, passed through.
-
-All events are linear: free them with `gevents_free`, or consume them in a `case`.
 
 ## Proven (compile time)
 
@@ -63,15 +17,6 @@ In `src/classify.bats`, with the integer classifier
 * `class_flip_x` and `class_flip_y`: the class does not change when dx
   or dy changes sign.
 * `deadzone_diagonal`: the dead zone is not empty (every `(d, d)` is in it).
-
-Every choice is a datatype or a datasort, matched with `case+`: a
-displacement's class (`axis_class`: `Ambiguous | Horizontal | Vertical`),
-a pointer's phase (`phase`: `WithinSlop | DeadZone | LockedH | LockedV |
-Rejected | LongPressed | Inert`), how a drag ends (`drag_end`: `NoEnd |
-Committed | Cancelled`), a pointer's kind (`pointer_kind`: `Touch | Mouse
-| Pen`) and a region or none (`region`). The host's numbers for them
-(record and pointer kinds, -1 for no region) are read once, where its
-bytes are decoded.
 
 In `src/pointer.bats`, a pointer's phase is in its type, and each step's
 type says which phase can follow which (`MOVE`, `RELEASE`, `ABORT`;
@@ -101,36 +46,3 @@ cancel committing, an unlocked pointer panning, a locked pointer
 long-pressing, a phase or a region given as a number, and a match that
 leaves out a phase, a pointer kind or a class. Its runner also fails on
 any `case` without `+`.
-
-## Trace replay
-
-`tests/dynamic/replay` replays pointer sequences through the pure
-library and compares the events with `expected`, running under valgrind
-(no leaks). It covers:
-
-- a flick, a slow drag, a long drag, and a flick back against the drag;
-- a diagonal, a vertical drag in a horizontal region, and a lock that then cannot turn;
-- an edge start, a pointercancel, and cancel-all;
-- a second finger, and pinch taking over a drag;
-- a long-press, and a long-press lost to movement;
-- unknown ids, and a fifth finger;
-- a rendered offset, and a touch-only region;
-- the byte format.
-
-These traces are written by hand from the sequences Android delivers.
-Recordings from real devices can be added in the same form.
-
-## Constants
-
-All thresholds are in `src/consts.bats`, in CSS px (never multiplied by
-`devicePixelRatio`). Positions are in 1/16 px.
-
-| Constant | Value |
-|---|---|
-| Slop | 8 px |
-| Dead zone | `5·minor < 2·major` |
-| Commit distance | 100 px |
-| Commit velocity | 300 px/s, over the last 100 ms, samples ≥ 50 ms apart |
-| Long-press | 500 ms |
-| Edge margin | 24 px |
-| Pointer slots | 4 |
